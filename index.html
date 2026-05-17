@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Geschenke-Manager – Prototyp</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: Arial, sans-serif; background: #f4f6f8; color: #222; }
+    header { background: #263238; color: white; padding: 22px; text-align: center; }
+    header h1 { margin: 0; }
+    header p { margin: 8px 0 0; color: #d7e0e5; }
+    main { max-width: 1150px; margin: 24px auto; padding: 0 16px 40px; display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    section { background: white; border-radius: 12px; padding: 18px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
+    .full { grid-column: 1 / -1; }
+    h2 { margin-top: 0; color: #263238; }
+    label { display: block; margin-top: 10px; font-weight: bold; font-size: 14px; }
+    input, select, textarea, button { width: 100%; padding: 9px; margin-top: 5px; border: 1px solid #ccd3d8; border-radius: 8px; font-size: 14px; }
+    textarea { min-height: 70px; resize: vertical; }
+    button { background: #1976d2; color: white; border: none; cursor: pointer; font-weight: bold; margin-top: 12px; }
+    button:hover { background: #125aa0; }
+    button.secondary { background: #607d8b; }
+    button.danger { background: #c62828; }
+    button.success { background: #2e7d32; }
+    .cards { display: grid; gap: 10px; margin-top: 12px; }
+    .card { border: 1px solid #e0e0e0; border-left: 5px solid #1976d2; padding: 12px; border-radius: 10px; background: #fbfcfd; }
+    .card h3 { margin: 0 0 6px; }
+    .small { font-size: 13px; color: #555; }
+    .badge { display: inline-block; padding: 4px 8px; border-radius: 20px; background: #e3f2fd; color: #0d47a1; font-size: 12px; margin: 3px 4px 3px 0; }
+    .badge.open { background: #fff3e0; color: #e65100; }
+    .badge.done { background: #e8f5e9; color: #1b5e20; }
+    .badge.plan { background: #ede7f6; color: #4527a0; }
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+    .actions button { width: auto; padding: 7px 10px; margin-top: 0; font-size: 13px; }
+    img.preview { max-width: 100%; max-height: 140px; margin-top: 8px; border-radius: 8px; border: 1px solid #ddd; }
+    .notice { background: #fff8e1; border-left: 5px solid #ffb300; padding: 10px; border-radius: 8px; margin-top: 8px; }
+    .empty { color: #777; font-style: italic; margin-top: 8px; }
+    @media (max-width: 850px) { main { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Geschenke-Manager</h1>
+    <p>Prototyp zur Verwaltung von Personen, Geschenkideen, vergangenen Geschenken und Erinnerungen</p>
+  </header>
+
+  <main>
+    <section>
+      <h2>Person anlegen</h2>
+      <label>Name</label>
+      <input id="personName" placeholder="z. B. Max Mustermann" />
+      <label>Geburtstag</label>
+      <input id="personBirthday" type="date" />
+      <label>Weitere Infos / Interessen</label>
+      <textarea id="personInfo" placeholder="z. B. Fußball, Technik, Bücher"></textarea>
+      <button onclick="addPerson()">Person speichern</button>
+    </section>
+
+    <section>
+      <h2>Geschenkidee hinzufügen</h2>
+      <label>Person</label>
+      <select id="ideaPerson"></select>
+      <label>Beschreibung</label>
+      <input id="ideaText" placeholder="z. B. Kopfhörer, Buch, Gutschein" />
+      <label>Anlass</label>
+      <select id="ideaOccasion">
+        <option>Geburtstag</option>
+        <option>Weihnachten</option>
+        <option>Sonstiger Anlass</option>
+      </select>
+      <label>Status</label>
+      <select id="ideaStatus">
+        <option>offen</option>
+        <option>geplant</option>
+        <option>gekauft</option>
+      </select>
+      <label>Link (optional)</label>
+      <input id="ideaLink" placeholder="https://..." />
+      <label>Bild-URL (optional)</label>
+      <input id="ideaImage" placeholder="https://..." />
+      <button onclick="addIdea()">Geschenkidee speichern</button>
+    </section>
+
+    <section class="full">
+      <h2>Übersicht Personen</h2>
+      <div id="peopleList" class="cards"></div>
+    </section>
+
+    <section>
+      <h2>Erinnerungen</h2>
+      <div id="reminders"></div>
+    </section>
+
+    <section>
+      <h2>Ideen automatisch generieren</h2>
+      <p class="small">Dieser Prototyp erstellt einfache Vorschläge auf Basis der hinterlegten Interessen.</p>
+      <label>Person</label>
+      <select id="generatePerson"></select>
+      <button onclick="generateIdeas()">Ideen generieren</button>
+      <div id="generatedIdeas" class="cards"></div>
+    </section>
+
+    <section class="full">
+      <h2>HTML-Darstellung / Export</h2>
+      <p class="small">Hier wird die vollständige Liste als einfache HTML-Ansicht dargestellt.</p>
+      <button class="secondary" onclick="renderHtmlExport()">HTML-Ansicht erzeugen</button>
+      <div id="htmlExport" class="cards"></div>
+    </section>
+  </main>
+
+  <script>
+    let data = JSON.parse(localStorage.getItem("geschenkeManagerData")) || { people: [], ideas: [], gifts: [] };
+
+    function save() {
+      localStorage.setItem("geschenkeManagerData", JSON.stringify(data));
+      render();
+    }
+
+    function addPerson() {
+      const name = document.getElementById("personName").value.trim();
+      const birthday = document.getElementById("personBirthday").value;
+      const info = document.getElementById("personInfo").value.trim();
+      if (!name || !birthday) { alert("Bitte Name und Geburtstag eingeben."); return; }
+      data.people.push({ id: Date.now(), name, birthday, info });
+      document.getElementById("personName").value = "";
+      document.getElementById("personBirthday").value = "";
+      document.getElementById("personInfo").value = "";
+      save();
+    }
+
+    function addIdea() {
+      const personId = Number(document.getElementById("ideaPerson").value);
+      const text = document.getElementById("ideaText").value.trim();
+      const occasion = document.getElementById("ideaOccasion").value;
+      const status = document.getElementById("ideaStatus").value;
+      const link = document.getElementById("ideaLink").value.trim();
+      const image = document.getElementById("ideaImage").value.trim();
+      if (!personId || !text) { alert("Bitte Person und Beschreibung eingeben."); return; }
+      data.ideas.push({ id: Date.now(), personId, text, occasion, status, link, image });
+      document.getElementById("ideaText").value = "";
+      document.getElementById("ideaLink").value = "";
+      document.getElementById("ideaImage").value = "";
+      save();
+    }
+
+    function convertIdeaToGift(id) {
+      const idea = data.ideas.find(i => i.id === id);
+      if (!idea) return;
+      data.gifts.push({ id: Date.now(), personId: idea.personId, name: idea.text, occasion: idea.occasion, date: new Date().toISOString().slice(0,10) });
+      data.ideas = data.ideas.filter(i => i.id !== id);
+      save();
+    }
+
+    function deletePerson(id) {
+      if (!confirm("Person wirklich löschen? Zugehörige Ideen und Geschenke werden ebenfalls entfernt.")) return;
+      data.people = data.people.filter(p => p.id !== id);
+      data.ideas = data.ideas.filter(i => i.personId !== id);
+      data.gifts = data.gifts.filter(g => g.personId !== id);
+      save();
+    }
+
+    function deleteIdea(id) {
+      data.ideas = data.ideas.filter(i => i.id !== id);
+      save();
+    }
+
+    function sharePerson(id) {
+      const person = data.people.find(p => p.id === id);
+      const ideas = data.ideas.filter(i => i.personId === id);
+      const text = "Geschenkideen für " + person.name + ": " + ideas.map(i => i.text).join(", ");
+      navigator.clipboard.writeText(text).then(() => alert("Teilbarer Text wurde in die Zwischenablage kopiert."));
+    }
+
+    function daysUntilBirthday(birthday) {
+      const today = new Date();
+      const b = new Date(birthday);
+      let next = new Date(today.getFullYear(), b.getMonth(), b.getDate());
+      if (next < today) next.setFullYear(today.getFullYear() + 1);
+      return Math.ceil((next - today) / (1000 * 60 * 60 * 24));
+    }
+
+    function statusClass(status) {
+      if (status === "gekauft") return "done";
+      if (status === "geplant") return "plan";
+      return "open";
+    }
+
+    function renderSelects() {
+      const selects = [document.getElementById("ideaPerson"), document.getElementById("generatePerson")];
+      selects.forEach(select => {
+        select.innerHTML = "";
+        data.people.forEach(p => {
+          const option = document.createElement("option");
+          option.value = p.id;
+          option.textContent = p.name;
+          select.appendChild(option);
+        });
+      });
+    }
+
+    function renderPeople() {
+      const list = document.getElementById("peopleList");
+      list.innerHTML = "";
+      if (data.people.length === 0) { list.innerHTML = '<p class="empty">Noch keine Personen angelegt.</p>'; return; }
+      data.people.forEach(person => {
+        const ideas = data.ideas.filter(i => i.personId === person.id);
+        const gifts = data.gifts.filter(g => g.personId === person.id);
+        const card = document.createElement("div");
+        card.className = "card";
+
+        let ideasHtml = ideas.length ? ideas.map(i => `
+          <div class="card">
+            <strong>${i.text}</strong><br/>
+            <span class="badge">${i.occasion}</span>
+            <span class="badge ${statusClass(i.status)}">${i.status}</span>
+            ${i.link ? `<p><a href="${i.link}" target="_blank">Link öffnen</a></p>` : ""}
+            ${i.image ? `<img class="preview" src="${i.image}" alt="Bild zur Geschenkidee"/>` : ""}
+            <div class="actions">
+              <button class="success" onclick="convertIdeaToGift(${i.id})">In Geschenk umwandeln</button>
+              <button class="danger" onclick="deleteIdea(${i.id})">Idee löschen</button>
+            </div>
+          </div>`).join("") : '<p class="empty">Keine Geschenkideen vorhanden.</p>';
+
+        let giftsHtml = gifts.length ? gifts.map(g => `
+          <div><span class="badge done">${g.occasion}</span> ${g.name} (${g.date})</div>`).join("") : '<p class="empty">Noch keine vergangenen Geschenke dokumentiert.</p>';
+
+        card.innerHTML = `
+          <h3>${person.name}</h3>
+          <p class="small">Geburtstag: ${person.birthday}</p>
+          <p>${person.info || "Keine Zusatzinformationen"}</p>
+          <h4>Geschenkideen</h4>${ideasHtml}
+          <h4>Vergangene Geschenke</h4>${giftsHtml}
+          <div class="actions">
+            <button onclick="sharePerson(${person.id})">Ideen teilen</button>
+            <button class="danger" onclick="deletePerson(${person.id})">Person löschen</button>
+          </div>`;
+        list.appendChild(card);
+      });
+    }
+
+    function renderReminders() {
+      const box = document.getElementById("reminders");
+      box.innerHTML = "";
+      const birthdaySoon = data.people.filter(p => daysUntilBirthday(p.birthday) <= 30);
+      if (birthdaySoon.length === 0) {
+        box.innerHTML += '<p class="empty">Keine Geburtstage in den nächsten 30 Tagen.</p>';
+      } else {
+        birthdaySoon.forEach(p => {
+          const ideas = data.ideas.filter(i => i.personId === p.id);
+          box.innerHTML += `<div class="notice"><strong>${p.name}</strong> hat in ${daysUntilBirthday(p.birthday)} Tagen Geburtstag.<br/>Bekannte Geschenkideen: ${ideas.length ? ideas.map(i => i.text).join(", ") : "keine"}</div>`;
+        });
+      }
+      const month = new Date().getMonth() + 1;
+      if (month === 12) box.innerHTML += '<div class="notice"><strong>Weihnachten:</strong> Bitte prüfe den Status der geplanten Geschenke.</div>';
+    }
+
+    function generateIdeas() {
+      const personId = Number(document.getElementById("generatePerson").value);
+      const person = data.people.find(p => p.id === personId);
+      const box = document.getElementById("generatedIdeas");
+      box.innerHTML = "";
+      if (!person) { box.innerHTML = '<p class="empty">Bitte zuerst eine Person anlegen.</p>'; return; }
+      const info = (person.info || "").toLowerCase();
+      let suggestions = ["Gutschein", "persönliche Karte", "gemeinsames Erlebnis"];
+      if (info.includes("technik")) suggestions.push("Bluetooth-Lautsprecher", "Powerbank");
+      if (info.includes("buch") || info.includes("lesen")) suggestions.push("Buch", "Lesezeichen");
+      if (info.includes("sport") || info.includes("fußball")) suggestions.push("Sportzubehör", "Fanartikel");
+      if (info.includes("kochen")) suggestions.push("Kochbuch", "Gewürzset");
+      suggestions.forEach(s => {
+        const div = document.createElement("div");
+        div.className = "card";
+        div.innerHTML = `<strong>${s}</strong><button onclick="takeGeneratedIdea(${person.id}, '${s}')">In Ideen übernehmen</button>`;
+        box.appendChild(div);
+      });
+    }
+
+    function takeGeneratedIdea(personId, text) {
+      data.ideas.push({ id: Date.now(), personId, text, occasion: "Geburtstag", status: "offen", link: "", image: "" });
+      save();
+      generateIdeas();
+    }
+
+    function renderHtmlExport() {
+      const box = document.getElementById("htmlExport");
+      let output = "<div class='card'><h3>Vollständige Liste</h3>";
+      data.people.forEach(p => {
+        output += `<h4>${p.name}</h4><p>Geburtstag: ${p.birthday}</p><p>Infos: ${p.info || "-"}</p>`;
+        output += "<strong>Ideen:</strong><ul>";
+        data.ideas.filter(i => i.personId === p.id).forEach(i => output += `<li>${i.text} – ${i.occasion} – ${i.status}</li>`);
+        output += "</ul><strong>Geschenke:</strong><ul>";
+        data.gifts.filter(g => g.personId === p.id).forEach(g => output += `<li>${g.name} – ${g.occasion} – ${g.date}</li>`);
+        output += "</ul>";
+      });
+      output += "</div>";
+      box.innerHTML = output;
+    }
+
+    function render() {
+      renderSelects();
+      renderPeople();
+      renderReminders();
+    }
+
+    render();
+  </script>
+</body>
+</html>
